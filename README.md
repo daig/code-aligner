@@ -16,6 +16,7 @@ void* operator new[](std::size_t size) = delete;
 void operator delete[](void* ptr) noexcept = delete;
 void operator delete(void* ptr, std::size_t) noexcept = delete;
 void operator delete[](void* ptr, std::size_t) noexcept = delete;
+```
 
 
 After alignment with delimiters "operator ( noexcept =":
