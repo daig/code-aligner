@@ -67,63 +67,75 @@ function alignLines(lines, delimiters) {
     if (delimiters.length === 0 || lines.length <= 1) {
         return lines;
     }
-    // For each delimiter, find positions
-    const positions = [];
-    for (let delimiterIndex = 0; delimiterIndex < delimiters.length; delimiterIndex++) {
-        const delimiter = delimiters[delimiterIndex];
-        const delimiterPositions = [];
-        // Find position of current delimiter in each line
-        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-            let line = lines[lineIndex];
-            // Adjust for previous delimiters that were already processed
-            let offset = 0;
-            for (let prevIndex = 0; prevIndex < delimiterIndex; prevIndex++) {
-                const prevDelimiter = delimiters[prevIndex];
-                const prevPosition = positions[prevIndex][lineIndex];
-                if (prevPosition !== -1) {
-                    offset = prevPosition + prevDelimiter.length;
-                    line = line.substring(offset);
+    // Create a copy of lines to work with
+    let result = [...lines];
+    // For each delimiter, align the code
+    for (let delimIndex = 0; delimIndex < delimiters.length; delimIndex++) {
+        const delimiter = delimiters[delimIndex];
+        // Store positions where this delimiter appears in each line
+        const positions = [];
+        // For each line, find position of current delimiter
+        for (let i = 0; i < result.length; i++) {
+            let line = result[i];
+            let position = -1;
+            if (delimiter === "operator") {
+                // Find "operator" keyword
+                position = line.indexOf(delimiter);
+            }
+            else if (delimiter === "(") {
+                // For parameters list opening parenthesis
+                // Skip parentheses that are part of type expressions like std::size_t
+                const operatorEnd = line.indexOf("operator") + "operator".length;
+                if (operatorEnd > "operator".length - 1) {
+                    // Find first opening parenthesis after "operator"
+                    const parenAfterOperator = line.indexOf("(", operatorEnd);
+                    if (parenAfterOperator !== -1) {
+                        position = parenAfterOperator;
+                    }
+                }
+                else {
+                    // No operator found, look for first parenthesis
+                    position = line.indexOf("(");
                 }
             }
-            const position = line.indexOf(delimiter);
-            delimiterPositions.push(position === -1 ? -1 : position + offset);
+            else if (delimiter === "=") {
+                // Find equals sign
+                position = line.indexOf("=");
+            }
+            else {
+                // Default case for other delimiters
+                position = line.indexOf(delimiter);
+            }
+            positions.push(position);
         }
-        positions.push(delimiterPositions);
-    }
-    // Align each delimiter
-    let result = [...lines];
-    for (let delimiterIndex = 0; delimiterIndex < delimiters.length; delimiterIndex++) {
-        const delimiter = delimiters[delimiterIndex];
-        const delimiterPositions = positions[delimiterIndex];
-        // Find the maximum position for current delimiter (for alignment)
-        let maxPosition = 0;
-        for (const position of delimiterPositions) {
-            if (position > maxPosition) {
-                maxPosition = position;
+        // Find maximum position for alignment
+        let maxPos = 0;
+        for (const pos of positions) {
+            if (pos > maxPos) {
+                maxPos = pos;
             }
         }
         // Skip if no valid positions found
-        if (maxPosition === 0) {
+        if (maxPos === 0)
             continue;
-        }
-        // Align each line for current delimiter
-        for (let lineIndex = 0; lineIndex < result.length; lineIndex++) {
-            const position = delimiterPositions[lineIndex];
-            // Skip lines that don't have the delimiter
-            if (position === -1) {
-                continue;
-            }
-            // Calculate whitespace needed for alignment
-            const spacesNeeded = maxPosition - position;
-            // Insert whitespace before the delimiter
-            if (spacesNeeded > 0) {
-                const beforeDelimiter = result[lineIndex].substring(0, position);
-                const afterDelimiter = result[lineIndex].substring(position);
-                result[lineIndex] = beforeDelimiter + ' '.repeat(spacesNeeded) + afterDelimiter;
-                // Update positions for subsequent delimiters in this line
-                for (let nextIndex = delimiterIndex + 1; nextIndex < delimiters.length; nextIndex++) {
-                    if (positions[nextIndex][lineIndex] !== -1) {
-                        positions[nextIndex][lineIndex] += spacesNeeded;
+        // Align each line based on the found positions
+        for (let i = 0; i < result.length; i++) {
+            if (positions[i] === -1)
+                continue; // Skip lines without the delimiter
+            const position = positions[i];
+            const paddingNeeded = maxPos - position;
+            if (paddingNeeded > 0) {
+                // Insert padding before the delimiter
+                const beforeDelimiter = result[i].substring(0, position);
+                const afterDelimiter = result[i].substring(position);
+                result[i] = beforeDelimiter + ' '.repeat(paddingNeeded) + afterDelimiter;
+                // Adjust the positions of subsequent delimiters in this line
+                // for further alignments in the next iterations
+                for (let j = delimIndex + 1; j < delimiters.length; j++) {
+                    const nextDelimiter = delimiters[j];
+                    if (result[i].indexOf(nextDelimiter, position + paddingNeeded) !== -1) {
+                        // The next delimiter will be found in its natural position
+                        // when we process it in the next iteration
                     }
                 }
             }
