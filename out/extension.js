@@ -69,73 +69,82 @@ function alignLines(lines, delimiters) {
     }
     // Create a copy of lines to work with
     let result = [...lines];
-    // For each delimiter, align the code
+    // For each delimiter in sequence
     for (let delimIndex = 0; delimIndex < delimiters.length; delimIndex++) {
         const delimiter = delimiters[delimIndex];
-        // Store positions where this delimiter appears in each line
-        const positions = [];
-        // For each line, find position of current delimiter
-        for (let i = 0; i < result.length; i++) {
-            let line = result[i];
-            let position = -1;
-            if (delimiter === "operator") {
-                // Find "operator" keyword
-                position = line.indexOf(delimiter);
+        // Find the positions of all occurrences of this delimiter in each line
+        const occurrencePositions = [];
+        // First, collect all occurrences of the delimiter in each line
+        for (let lineIndex = 0; lineIndex < result.length; lineIndex++) {
+            const line = result[lineIndex];
+            const positions = [];
+            let pos = 0;
+            while (pos < line.length) {
+                const foundPos = line.indexOf(delimiter, pos);
+                if (foundPos === -1)
+                    break;
+                positions.push(foundPos);
+                pos = foundPos + delimiter.length;
             }
-            else if (delimiter === "(") {
-                // For parameters list opening parenthesis
-                // Skip parentheses that are part of type expressions like std::size_t
-                const operatorEnd = line.indexOf("operator") + "operator".length;
-                if (operatorEnd > "operator".length - 1) {
-                    // Find first opening parenthesis after "operator"
-                    const parenAfterOperator = line.indexOf("(", operatorEnd);
-                    if (parenAfterOperator !== -1) {
-                        position = parenAfterOperator;
+            occurrencePositions.push(positions);
+        }
+        // Find the maximum number of occurrences across all lines
+        const maxOccurrences = Math.max(...occurrencePositions.map(positions => positions.length));
+        // Process each occurrence (1st, 2nd, 3rd, etc.)
+        for (let occurrenceIndex = 0; occurrenceIndex < maxOccurrences; occurrenceIndex++) {
+            // Get position of this occurrence in each line (if it exists)
+            const positionsForThisOccurrence = [];
+            for (let lineIndex = 0; lineIndex < result.length; lineIndex++) {
+                if (occurrencePositions[lineIndex].length > occurrenceIndex) {
+                    positionsForThisOccurrence.push({
+                        lineIndex,
+                        position: occurrencePositions[lineIndex][occurrenceIndex]
+                    });
+                }
+            }
+            // Skip if no line has this occurrence
+            if (positionsForThisOccurrence.length === 0)
+                continue;
+            // 1. Clean up excess whitespace before the delimiter
+            for (const { lineIndex, position } of positionsForThisOccurrence) {
+                const line = result[lineIndex];
+                // Find the preceding non-whitespace character
+                let prevNonWhitespacePos = position - 1;
+                while (prevNonWhitespacePos >= 0 && /\s/.test(line[prevNonWhitespacePos])) {
+                    prevNonWhitespacePos--;
+                }
+                // If we found excessive whitespace
+                if (prevNonWhitespacePos < position - 1) {
+                    // Keep 1 space if there's a preceding character, or remove all if at line start
+                    const spacesToKeep = prevNonWhitespacePos >= 0 ? 1 : 0;
+                    const spacesToRemove = position - prevNonWhitespacePos - 1 - spacesToKeep;
+                    if (spacesToRemove > 0) {
+                        const beforeWhitespace = line.substring(0, prevNonWhitespacePos + 1);
+                        const whitespace = ' '.repeat(spacesToKeep);
+                        const afterWhitespace = line.substring(position);
+                        result[lineIndex] = beforeWhitespace + whitespace + afterWhitespace;
+                        // Update positions for this and all subsequent occurrences in this line
+                        const adjustment = -spacesToRemove;
+                        for (let i = occurrenceIndex; i < occurrencePositions[lineIndex].length; i++) {
+                            occurrencePositions[lineIndex][i] += adjustment;
+                        }
                     }
                 }
-                else {
-                    // No operator found, look for first parenthesis
-                    position = line.indexOf("(");
-                }
             }
-            else if (delimiter === "=") {
-                // Find equals sign
-                position = line.indexOf("=");
-            }
-            else {
-                // Default case for other delimiters
-                position = line.indexOf(delimiter);
-            }
-            positions.push(position);
-        }
-        // Find maximum position for alignment
-        let maxPos = 0;
-        for (const pos of positions) {
-            if (pos > maxPos) {
-                maxPos = pos;
-            }
-        }
-        // Skip if no valid positions found
-        if (maxPos === 0)
-            continue;
-        // Align each line based on the found positions
-        for (let i = 0; i < result.length; i++) {
-            if (positions[i] === -1)
-                continue; // Skip lines without the delimiter
-            const position = positions[i];
-            const paddingNeeded = maxPos - position;
-            if (paddingNeeded > 0) {
-                // Insert padding before the delimiter
-                const beforeDelimiter = result[i].substring(0, position);
-                const afterDelimiter = result[i].substring(position);
-                result[i] = beforeDelimiter + ' '.repeat(paddingNeeded) + afterDelimiter;
-                // Adjust the positions of subsequent delimiters in this line
-                // for further alignments in the next iterations
-                for (let j = delimIndex + 1; j < delimiters.length; j++) {
-                    const nextDelimiter = delimiters[j];
-                    if (result[i].indexOf(nextDelimiter, position + paddingNeeded) !== -1) {
-                        // The next delimiter will be found in its natural position
-                        // when we process it in the next iteration
+            // 2. Find the maximum position among all occurrences after cleaning
+            const maxPosition = Math.max(...positionsForThisOccurrence.map(({ lineIndex }) => occurrencePositions[lineIndex][occurrenceIndex]));
+            // 3. Add padding to align to the maximum position
+            for (const { lineIndex } of positionsForThisOccurrence) {
+                const position = occurrencePositions[lineIndex][occurrenceIndex];
+                const paddingNeeded = maxPosition - position;
+                if (paddingNeeded > 0) {
+                    const line = result[lineIndex];
+                    const beforeDelimiter = line.substring(0, position);
+                    const afterDelimiter = line.substring(position);
+                    result[lineIndex] = beforeDelimiter + ' '.repeat(paddingNeeded) + afterDelimiter;
+                    // Update positions for all subsequent occurrences in this line
+                    for (let i = occurrenceIndex; i < occurrencePositions[lineIndex].length; i++) {
+                        occurrencePositions[lineIndex][i] += paddingNeeded;
                     }
                 }
             }

@@ -16,22 +16,23 @@ void* operator new[](std::size_t size) = delete;
 void operator delete[](void* ptr) noexcept = delete;
 void operator delete(void* ptr, std::size_t) noexcept = delete;
 void operator delete[](void* ptr, std::size_t) noexcept = delete;
-```
 
-After alignment with delimiters "operator ( =":
+
+After alignment with delimiters "operator ( noexcept =":
 ```
 void* operator new     (std::size_t size)                = delete;
-void  operator delete  (void* ptr) noexcept              = delete;
+void  operator delete  (void* ptr)              noexcept = delete;
 void* operator new[]   (std::size_t size)                = delete;
-void  operator delete[](void* ptr) noexcept              = delete;
+void  operator delete[](void* ptr)              noexcept = delete;
 void  operator delete  (void* ptr, std::size_t) noexcept = delete;
 void  operator delete[](void* ptr, std::size_t) noexcept = delete;
 ```
 
+
 ## Usage
 
 1. Select the lines of code you want to align
-2. Press `Ctrl+Alt+A` (Windows/Linux) or `Cmd+Alt+A` (Mac), or open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`) and select "Align Code"
+2. Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`) and select "Align Code"
 3. Enter the delimiters to align with, separated by spaces (e.g., "operator ( =")
 4. The selected code will be aligned according to the specified delimiters
 
